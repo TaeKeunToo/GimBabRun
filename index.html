@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>김밥런</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-info {
+            display: flex;
+            justify-content: space-between;
+            width: 90%;
+            max-width: 800px;
+            margin-bottom: 10px;
+        }
+
+        #score-board, #soul-board {
+            font-size: 2em;
+            color: #333;
+        }
+
+        #game-container {
+            position: relative;
+            width: 90%;
+            max-width: 800px;
+            height: 300px;
+            border: 5px solid #333;
+            background-color: #87CEEB;
+            overflow: hidden;
+        }
+
+        #gimbap {
+            position: absolute;
+            bottom: 50px;
+            left: 50px;
+            width: 70px;
+            height: 35px;
+            background-color: #333;
+            border-radius: 17px;
+            z-index: 10;
+        }
+
+        #gimbap::before {
+            content: '';
+            position: absolute;
+            width: 70%;
+            height: 70%;
+            background-color: #fff;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #gimbap::after {
+            content: '';
+            position: absolute;
+            width: 30%;
+            height: 30%;
+            background-color: #FF5722;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .eye {
+            width: 8px;
+            height: 8px;
+            background-color: #333;
+            border-radius: 50%;
+            position: absolute;
+            top: 10px;
+            z-index: 11;
+        }
+        .eye.left { left: 45px; }
+        .eye.right { left: 58px; }
+
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 50px;
+            background-color: #4CAF50;
+        }
+
+        /* [수정] tall-obstacle 클래스에도 position: absolute를 적용합니다. */
+        .obstacle, .item, .tall-obstacle {
+            position: absolute;
+            z-index: 5;
+        }
+
+        .obstacle {
+            width: 50px;
+            height: 50px;
+            background-color: #d32f2f;
+            bottom: 50px;
+        }
+
+        .tall-obstacle {
+            width: 50px;
+            height: 100px;
+            background-color: #d32f2f;
+            bottom: 50px;
+        }
+
+        .item {
+            width: 40px;
+            height: 40px;
+            background-color: #FFEB3B;
+            border-radius: 50%;
+        }
+        
+        #game-start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            z-index: 20;
+        }
+
+        #game-start-screen h2 { font-size: 2.5em; }
+        #game-start-screen p { font-size: 1.2em; }
+        
+        #game-over-screen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+        }
+
+        #game-over-screen h2 { font-size: 2.5em; }
+        #game-over-screen p { font-size: 1.2em; }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1.5em;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-info">
+        <div id="soul-board"></div>
+        <div id="score-board">점수: 0</div>
+    </div>
+    <div id="game-container">
+        <div id="gimbap">
+            <div class="eye left"></div>
+            <div class="eye right"></div>
+        </div>
+        <div class="ground"></div>
+        
+        <div id="game-start-screen">
+            <h2>김밥런</h2>
+            <p>화면을 클릭해서 김밥을 점프시키세요!</p>
+            <button id="startButton">시작</button>
+        </div>
+        
+        <div id="game-over-screen">
+            <h2>게임 오버!</h2>
+            <p>최종 점수: <span id="final-score">0</span></p>
+            <button id="restartButton">다시 시작</button>
+        </div>
+    </div>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const gimbap = document.getElementById('gimbap');
+        const scoreBoard = document.getElementById('score-board');
+        const soulBoard = document.getElementById('soul-board');
+        const startScreen = document.getElementById('game-start-screen');
+        const startButton = document.getElementById('startButton');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const restartButton = document.getElementById('restartButton');
+
+        let isJumping = false;
+        let gimbapPosition = 50;
+        let jumpPower = 0;
+        const gravity = 0.6;
+        const groundHeight = 50;
+        let gameSpeed = 5;
+        let score = 0;
+        let souls = 5;
+        let gameRunning = false;
+        let obstacleIntervalId;
+        let itemIntervalId;
+        let gameLoopId;
+
+        function updateSoulBoard() {
+            soulBoard.textContent = '영혼: ' + '★'.repeat(souls);
+        }
+
+        function startGame() {
+            gameRunning = true;
+            score = 0;
+            souls = 5;
+            gameSpeed = 5;
+            gimbapPosition = 50;
+            gimbap.style.bottom = `${gimbapPosition}px`;
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            
+            document.querySelectorAll('.obstacle, .item, .tall-obstacle').forEach(el => el.remove());
+
+            updateSoulBoard();
+
+            setTimeout(() => {
+                gameLoopId = requestAnimationFrame(gameLoop);
+                obstacleIntervalId = setInterval(spawnObstacle, 2000);
+                itemIntervalId = setInterval(spawnItem, 1500);
+            }, 50);
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            gimbapPosition += jumpPower;
+            jumpPower -= gravity;
+
+            if (gimbapPosition <= groundHeight) {
+                gimbapPosition = groundHeight;
+                isJumping = false;
+                jumpPower = 0;
+            }
+            gimbap.style.bottom = `${gimbapPosition}px`;
+
+            document.querySelectorAll('.obstacle, .item, .tall-obstacle').forEach(el => {
+                let currentLeft = parseFloat(el.style.left) || gameContainer.clientWidth;
+                el.style.left = `${currentLeft - gameSpeed}px`;
+                
+                checkCollision(el);
+
+                if (currentLeft < -el.offsetWidth) {
+                    el.remove();
+                }
+            });
+
+            score += 0.1;
+            scoreBoard.textContent = `점수: ${Math.floor(score)}`;
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function checkCollision(el) {
+            const gimbapRect = gimbap.getBoundingClientRect();
+            const elRect = el.getBoundingClientRect();
+            
+            const isColliding = (
+                gimbapRect.left < elRect.right - 5 &&
+                gimbapRect.right > elRect.left + 5 &&
+                gimbapRect.top < elRect.bottom - 5 &&
+                gimbapRect.bottom > elRect.top + 5
+            );
+            
+            if (isColliding) {
+                if (el.dataset.hit === 'true') return;
+                el.dataset.hit = 'true';
+
+                if (el.classList.contains('obstacle') || el.classList.contains('tall-obstacle')) {
+                    gameSpeed = Math.max(1, gameSpeed - 2);
+                    
+                    souls--;
+                    updateSoulBoard();
+
+                    if (souls <= 0) {
+                        endGame();
+                    }
+                    
+                } else if (el.classList.contains('item')) {
+                    gameSpeed = Math.min(12, gameSpeed + 3);
+                    score += 100;
+                    scoreBoard.textContent = `점수: ${Math.floor(score)}`;
+                }
+                
+                el.remove();
+            }
+        }
+
+        function jump() {
+            if (!isJumping && gameRunning) {
+                isJumping = true;
+                jumpPower = 15;
+            }
+        }
+
+        function spawnObstacle() {
+            if (!gameRunning) return;
+            const obstacle = document.createElement('div');
+            if (Math.random() > 0.5) {
+                obstacle.classList.add('obstacle');
+            } else {
+                obstacle.classList.add('tall-obstacle');
+            }
+            obstacle.style.left = `${gameContainer.clientWidth}px`;
+            gameContainer.appendChild(obstacle);
+        }
+
+        function spawnItem() {
+            if (!gameRunning) return;
+            const item = document.createElement('div');
+            item.classList.add('item');
+            item.style.left = `${gameContainer.clientWidth}px`;
+            item.style.bottom = `${Math.random() * (100) + 80}px`;
+            gameContainer.appendChild(item);
+        }
+
+        function endGame() {
+            gameRunning = false;
+            cancelAnimationFrame(gameLoopId);
+            clearInterval(obstacleIntervalId);
+            clearInterval(itemIntervalId);
+            finalScoreDisplay.textContent = Math.floor(score);
+            gameOverScreen.style.display = 'flex';
+        }
+
+        document.addEventListener('click', jump);
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', startGame);
+
+    </script>
+</body>
+</html>
